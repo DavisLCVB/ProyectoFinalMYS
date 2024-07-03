@@ -5,6 +5,7 @@
 # Imports
 from scipy.stats import chi2
 import numpy as np
+import pandas as pd
 
 na_numbs = []
 # Lectura de los números pseudoaleatorios
@@ -24,14 +25,19 @@ with open("linespaces.txt", "r") as f:
         ls = float(line.strip())
         S.append(ls)
 
-print(S)
 K = len(S) - 1
 
 # Preparación de variables
-obsF, _ = np.histogram(na_numbs,S)  # Frecuencia observada
+obsF, edg = np.histogram(na_numbs,S)  # Frecuencia observada
 expF = np.full(K, N/K) # Frecuencia esperada
 
-print(obsF)
+df = pd.DataFrame({
+    'Bin Start': edg[:-1],
+    'Bin End': edg[1:],
+    'Frequency':obsF
+})
+
+df.to_excel("histogram.xlsx", index=False)
 
 chi2_0 = np.sum((obsF - expF)**2/expF) # Chi cuadrada calculada
 chi2_C = chi2.ppf(ALPHA,K-1) # Chi cuadrada de comparacion
