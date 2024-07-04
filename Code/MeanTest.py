@@ -16,12 +16,13 @@ x = sum(na_nums)/N
 s = np.std(na_nums)
 ALPHA = 0.05
 
-Li = 1/2-(norm.ppf((1-ALPHA/2), loc=x, scale=s))
-Ls = 1/2+(norm.ppf((1-ALPHA/2), loc=x, scale=s))
+Li = 1/2-(norm.ppf((1-ALPHA/2), loc=0, scale=1))
+Ls = 1/2+(norm.ppf((1-ALPHA/2), loc=0, scale=1))
 
+print(f"La media es {x}")
 print(f"Rango: < {Li} ; {Ls} >")
-if 0.5 > Li and 0.5 < Ls:
-    print("0.5 se encuentra en el rango\nSe acepta H0")
+if x > Li and x < Ls:
+    print("La media es equivalente a 0.5\nSe acepta H0")
 else:
-    print("0.5 no se encuentra en el rango\nSe rechaza H0")
+    print("La media no es equivalente a 0.5\nSe rechaza H0")
 
