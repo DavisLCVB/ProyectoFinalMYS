@@ -1,12 +1,16 @@
 from NAGenerator import NAGenerator, SEED, MULTIPLIER, MODULUS
-from BetaGenerator import *
+from Generators import *
 import pandas as pd
+import matplotlib.pyplot as plt
 
 
 # Clase que representa un servidor
 class Server:
     def __init__(self, gen: Generator) -> None:
         self.gen = gen
+        self.end = 0
+
+    def reset(self):
         self.end = 0
 
 
@@ -25,6 +29,10 @@ class ServiceArray:
                 imin = i
         return imin, min
 
+    def reset(self):
+        for serv in self.servers:
+            serv.reset()
+
 
 # Variable que representa los servidores de procesamiento de documentos
 servers = ServiceArray(
@@ -32,7 +40,7 @@ servers = ServiceArray(
         Server(BetaGen(0.821, 1.47)),
         Server(BetaGen(0.774, 1.6)),
         Server(BetaGen(0.925, 1.98)),
-        Server(BetaGen(1.65, 0.408)),
+        Server(WeibullGen(1.65, 0.408)),
         Server(BetaGen(0.713, 1.13)),
     ]
 )
@@ -45,9 +53,10 @@ distribution = Server(BetaGen(2.5, 7.65))
 # Variable que representa el servidor de Derivación
 derivation = Server(ExponentialGen(0.173))
 
-
 # Número de ejecuciones
-runs = 30
+runs = 81815
+# Réplicas
+rep = 15
 # Tiempo de simulación
 time = 0
 # Datos de la simulación
@@ -75,59 +84,131 @@ data = {
     "NA's Servidor 5": [],
     "Inicio Servidor 5": [],
     "Fin Servidor 5": [],
-    "NA's Derivación": [],
-    "T. de Derivación": [],
-    "Inicio Derivación": [],
-    "Fin Derivación": [],
+    # "NA's Derivación": [],
+    # "T. de Derivación": [],
+    # "Inicio Derivación": [],
+    # "Fin Derivación": [],
     "Cola Distribución": [],
     "Cola Servidor": [],
-    "Cola Derivación": [],
+    # "Cola Derivación": [],
+    "Cola Total": [],
+    "Promedio Móvil": [],
 }
+# Suma
+suma = 0
 
 
 def get_time_serv(init_t, index):
     serv: Server = servers.servers[index]
     t_serv, nas = serv.gen.get_rand(rand)
+    if index == 0:
+        t_serv = -0.001 + 5.89 * t_serv
+    elif index == 1:
+        t_serv = -0.001 + 7 * t_serv
+    elif index == 2:
+        t_serv = -0.001 + 7 * t_serv
+    elif index == 3:
+        t_serv = -0.001 + t_serv
+    elif index == 4:
+        t_serv = -0.001 + 6 * t_serv
     servers.servers[index].end = init_t + t_serv
     return servers.servers[index].end, nas
+
 
 def update_serv_arr(index, init, end, nas):
     for i, _ in enumerate(servers.servers):
         if i != index:
-            data[f"NA's Servidor {i+1}"].append("")
-            data[f"Inicio Servidor {i+1}"].append(0)
-            data[f"Fin Servidor {i+1}"].append(0)
+            data[f"NA's Servidor {i + 1}"].append("")
+            data[f"Inicio Servidor {i + 1}"].append(0)
+            data[f"Fin Servidor {i + 1}"].append(0)
         else:
-            data[f"NA's Servidor {i+1}"].append(str(nas))
-            data[f"Inicio Servidor {i+1}"].append(init)
-            data[f"Fin Servidor {i+1}"].append(end)
+            data[f"NA's Servidor {i + 1}"].append(str(nas))
+            data[f"Inicio Servidor {i + 1}"].append(init)
+            data[f"Fin Servidor {i + 1}"].append(end)
+
+
+for i in range(rep):
+    data[f"Replica {i + 1}"] = []
+
+# Réplicas
+for i in range(rep - 1):
+    suma = 0
+    time = 0
+    servers.reset()
+    distribution.reset()
+    derivation.reset()
+    for run in range(runs):
+        # Arribo
+        inter_arr_t, arr_nas = arrival.get_rand(rand)  # T. de inter Arribo y NA's
+        inter_arr_t = -0.001 + 1.961 * inter_arr_t
+        time += inter_arr_t
+        # Tiempo de llegada
+        arr_t = time
+        # Distribución
+        dis_t, dis_nas = distribution.gen.get_rand(rand)  # T. Distribución y NA's
+        dist_t = -0.001 + 0.261 * dis_t
+        i_dis_t = max(arr_t, distribution.end)  # T. de inicio de distribución
+        e_dist_t = i_dis_t + dis_t  # T. de fin de distribución
+        distribution.end = e_dist_t  # Actualizar el fin del servidor de distribución
+        q_dis = i_dis_t - arr_t  # T. de cola de Distribución
+        # Servidor
+        in_serv, e_min = servers.min_server()  # Indice de servidor y fin mínimo
+        i_serv_t = max(e_min, e_dist_t)  # Inicio de servicio
+        # i_serv_t = max(e_min, arr_t)
+        e_serv_t, ser_nas = get_time_serv(i_serv_t, in_serv)  # Fin del servidor y NA's
+        q_serv = i_serv_t - e_dist_t  # Cola del servidor
+        # q_serv = i_serv_t - arr_t
+        # Derivación
+        # der_t, der_nas = derivation.gen.get_rand(rand)  # T. de derivación y NA's
+        # der_t = -0.001 + der_t
+        # i_der_t = max(e_serv_t, derivation.end)  # T. de inicio de derivación
+        # e_der_t = i_der_t + der_t  # T. de fin de distribución
+        # derivation.end = e_der_t  # Actualiza el fin del servidor de derivación
+        # q_der = i_der_t - e_serv_t  # Cola de derivación
+        q_der = 0
+        suma += q_der + q_dis + q_serv
+        data[f"Replica {i + 1}"].append(suma / (run + 1))
+
+suma = 0
+time = 0
+servers.reset()
+distribution.reset()
+derivation.reset()
 
 # Simulación
 for run in range(runs):
     # Arribo
     inter_arr_t, arr_nas = arrival.get_rand(rand)  # T. de inter Arribo y NA's
+    inter_arr_t = -0.001 + 1.961 * inter_arr_t
     time += inter_arr_t
     # Tiempo de llegada
     arr_t = time
     # Distribución
     dis_t, dis_nas = distribution.gen.get_rand(rand)  # T. Distribución y NA's
+    dist_t = -0.001 + 0.261 * dis_t
     i_dis_t = max(arr_t, distribution.end)  # T. de inicio de distribución
     e_dist_t = i_dis_t + dis_t  # T. de fin de distribución
-    distribution.end = e_dist_t # Actualizar el fin del servidor de distribución
+    distribution.end = e_dist_t  # Actualizar el fin del servidor de distribución
     q_dis = i_dis_t - arr_t  # T. de cola de Distribución
     # Servidor
     in_serv, e_min = servers.min_server()  # Indice de servidor y fin mínimo
-    i_serv_t = max(e_min, e_dist_t)  #  Inicio de servicio
+    i_serv_t = max(e_min, e_dist_t)  # Inicio de servicio
+    # i_serv_t = max(e_min, arr_t)
     e_serv_t, ser_nas = get_time_serv(i_serv_t, in_serv)  # Fin del servidor y NA's
     q_serv = i_serv_t - e_dist_t  # Cola del servidor
+    # q_serv = i_serv_t - arr_t
     # Derivación
-    der_t, der_nas = derivation.gen.get_rand(rand) # T. de derivación y NA's
-    i_der_t = max(e_serv_t, derivation.end) # T. de inicio de derivación
-    e_der_t = i_der_t + der_t # T. de fin de distribución
-    derivation.end = e_der_t # Actualiza el fin del servidor de derivación
-    q_der = i_der_t - e_serv_t # Cola de derivación
+    # der_t, der_nas = derivation.gen.get_rand(rand)  # T. de derivación y NA's
+    # der_t = -0.001 + der_t
+    # i_der_t = max(e_serv_t, derivation.end)  # T. de inicio de derivación
+    # e_der_t = i_der_t + der_t  # T. de fin de distribución
+    # derivation.end = e_der_t  # Actualiza el fin del servidor de derivación
+    # q_der = i_der_t - e_serv_t  # Cola de derivación
+    q_der = 0
+    suma += q_der + q_dis + q_serv
+    # suma += q_serv
     # Guardado de datos
-    data["Iteración"].append(run)
+    data["Iteración"].append(run + 1)
     data["NA's Arribo"].append(str(arr_nas))
     data["Arribo"].append(inter_arr_t)
     data["T. de Llegada"].append(arr_t)
@@ -135,17 +216,29 @@ for run in range(runs):
     data["T. Distribución"].append(dis_t)
     data["Inicio Distribución"].append(i_dis_t)
     data["Fin Distribución"].append(e_dist_t)
-    data["NA's Derivación"].append(str(der_nas))
-    data["T. de Derivación"].append(der_t)
-    data["Inicio Derivación"].append(i_der_t)
-    data["Fin Derivación"].append(e_der_t)
+    # data["NA's Derivación"].append(str(der_nas))
+    # data["T. de Derivación"].append(der_t)
+    # data["Inicio Derivación"].append(i_der_t)
+    # data["Fin Derivación"].append(e_der_t)
     data["Cola Distribución"].append(q_dis)
     data["Cola Servidor"].append(q_serv)
-    data["Cola Derivación"].append(q_der)
+    # data["Cola Derivación"].append(q_der)
+    data["Cola Total"].append(q_der + q_dis + q_serv)
+    data["Promedio Móvil"].append(suma / (run + 1))
     update_serv_arr(in_serv, i_serv_t, e_serv_t, ser_nas)
 
+data["Replica 15"] = data["Promedio Móvil"]
+x = [i + 1 for i in range(runs)]
+for key, value in data.items():
+    if key.startswith("Replica"):
+        plt.plot(x, value, label=f"{key}")
 
+plt.title("Estabilización de las repeticiones")
+plt.xlabel = "Nro Corridas"
+plt.ylabel = "Promedio móvil de la cola"
+plt.legend()
+plt.show()
 
 dataframe = pd.DataFrame(data)
-print(dataframe)
+# dataframe.to_csv("output.csv", index=False)
 dataframe.to_excel("output.xlsx", index=False)
