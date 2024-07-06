@@ -23,31 +23,36 @@ class NAGenerator:
             sequence.append(self.next())
         return sequence
 
+
 # Función para convertir los números al rango adecuado
 def to_dec(num):
     if num == 0:
         return 0
-    dig_num = math.floor(math.log10(abs(num)))+1
+    dig_num = math.floor(math.log10(abs(num))) + 1
     dec = num / (10**dig_num)
     return dec
+
 
 # Parámetros elegidos para el generador
 SEED = 962274
 MULTIPLIER = 916041
 MODULUS = 989249
 
-# Instanciando generador
-gen = NAGenerator(SEED, MULTIPLIER, MODULUS)
 
-# Número de na's a generar
-N = 1000000
+def main():
+    # Instanciando generador
+    gen = NAGenerator(SEED, MULTIPLIER, MODULUS)
 
-# Secuencia de números aleatorios
-na_sec = gen.get_sequence(N)
+    # Número de na's a generar
+    N = 2000000
 
-with open("numbers.txt", "w") as f:
-    for num in na_sec:
-        f.write(f"{round(to_dec(num), 4)}\n")
+    # Secuencia de números aleatorios
+    na_sec = gen.get_sequence(N)
+    print(len(na_sec))
 
+    with open("numbers.txt", "w") as f:
+        for i, num in enumerate(na_sec):
+            f.write(f"{round(to_dec(num), 4)}\n")
 
-
+if __name__ == "__main__":
+    main()
