@@ -130,6 +130,8 @@ def update_serv_arr(index, init, end, nas):
 for i in range(rep):
     data[f"Replica {i + 1}"] = []
 
+data["Valores medios de replicas"] = []
+
 # Réplicas
 for i in range(rep - 1):
     suma = 0
@@ -228,6 +230,7 @@ for run in range(runs):
     update_serv_arr(in_serv, i_serv_t, e_serv_t, ser_nas)
 
 data["Replica 15"] = data["Promedio Móvil"]
+
 x = [i + 1 for i in range(runs)]
 for key, value in data.items():
     if key.startswith("Replica"):
@@ -239,6 +242,51 @@ plt.ylabel = "Promedio móvil de la cola"
 plt.legend()
 plt.show()
 
+
+def welch_method(data, window_size):
+    half_window = window_size // 2
+    moving_avg = []
+
+    for i in range(len(data)):
+        start = max(0, i - half_window)
+        end = min(len(data), i + half_window + 1)
+        window_data = data[start:end]
+        moving_avg.append(np.mean(window_data))
+
+    return np.array(moving_avg)
+
+
+for i in range(runs):
+    sum_ins = 0
+    for j in range(rep):
+        sum_ins += data[f"Replica {j + 1}"][i]
+    data["Valores medios de replicas"].append(sum_ins / rep)
+
+fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+
+for i in range(10):
+    if i % 2 != 0 and i > 1:
+        data[f"Welch w={i}"] = welch_method(data["Valores medios de replicas"], i)
+
+axs[0, 0].plot(x, data[f"Welch w=3"], label=f"w=3")
+axs[0, 0].set_title(f"Welch w=3")
+axs[0, 0].legend()
+
+axs[0, 1].plot(x, data[f"Welch w=5"], label=f"w=5")
+axs[0, 1].set_title(f"Welch w=5")
+axs[0, 1].legend()
+
+axs[1, 0].plot(x, data[f"Welch w=7"], label=f"w=7")
+axs[1, 0].set_title(f"Welch w=7")
+axs[1, 0].legend()
+
+axs[1, 1].plot(x, data[f"Welch w=9"], label=f"w=9")
+axs[1, 1].set_title(f"Welch w=9")
+axs[1, 1].legend()
+
+plt.tight_layout()
+plt.show()
+
 dataframe = pd.DataFrame(data)
-# dataframe.to_csv("output.csv", index=False)
-dataframe.to_excel("output.xlsx", index=False)
+dataframe.to_csv("output.csv", index=False)
+# dataframe.to_excel("output.xlsx", index=False)
