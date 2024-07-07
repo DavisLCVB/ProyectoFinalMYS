@@ -34,6 +34,32 @@ class ServiceArray:
             serv.reset()
 
 
+class Doc:
+    def __init__(self):
+        self.end = 0
+
+
+class DocsArray:
+    def __init__(self):
+        self.count = 0
+        self.docs = []
+
+    def update(self, time):
+        for doc in self.docs:
+            if doc.end <= time:
+                self.docs.remove(doc)
+                self.count -= 1
+
+    def add(self, end):
+        self.docs.append(Doc())
+        self.docs[-1].end = end
+        self.count += 1
+
+    def reset(self):
+        self.count = 0
+        self.docs = []
+
+
 # Variable que representa los servidores de procesamiento de documentos
 servers = ServiceArray(
     [
@@ -52,6 +78,8 @@ arrival = BetaGen(0.76, 3.53)
 distribution = Server(BetaGen(2.5, 7.65))
 # Variable que representa el servidor de Derivación
 derivation = Server(ExponentialGen(0.173))
+
+docs = DocsArray()
 
 # Número de ejecuciones
 runs = 81815
@@ -92,10 +120,13 @@ data = {
     "Cola Servidor": [],
     # "Cola Derivación": [],
     "Cola Total": [],
+    "Documentos en Cola": [],
     "Promedio Móvil": [],
+    "Promedio Docs en Cola": []
 }
 # Suma
 suma = 0
+suma2 = 0
 
 
 def get_time_serv(init_t, index):
@@ -172,6 +203,7 @@ for i in range(rep - 1):
         data[f"Replica {i + 1}"].append(suma / (run + 1))
 
 suma = 0
+suma2 = 0
 time = 0
 servers.reset()
 distribution.reset()
@@ -208,6 +240,9 @@ for run in range(runs):
     # q_der = i_der_t - e_serv_t  # Cola de derivación
     q_der = 0
     suma += q_der + q_dis + q_serv
+    docs.add(i_dis_t)
+    docs.update(time)
+    suma2 += docs.count
     # suma += q_serv
     # Guardado de datos
     data["Iteración"].append(run + 1)
@@ -226,7 +261,9 @@ for run in range(runs):
     data["Cola Servidor"].append(q_serv)
     # data["Cola Derivación"].append(q_der)
     data["Cola Total"].append(q_der + q_dis + q_serv)
+    data["Documentos en Cola"].append(docs.count)
     data["Promedio Móvil"].append(suma / (run + 1))
+    data["Promedio Docs en Cola"].append(suma2 / (run + 1))
     update_serv_arr(in_serv, i_serv_t, e_serv_t, ser_nas)
 
 data["Replica 15"] = data["Promedio Móvil"]
@@ -264,9 +301,8 @@ for i in range(runs):
 
 fig, axs = plt.subplots(2, 2, figsize=(12, 10))
 
-for i in range(10):
-    if i % 2 != 0 and i > 1:
-        data[f"Welch w={i}"] = welch_method(data["Valores medios de replicas"], i)
+for i in [3, 5, 10, 19]:
+    data[f"Welch w={i}"] = welch_method(data["Valores medios de replicas"], i)
 
 axs[0, 0].plot(x, data[f"Welch w=3"], label=f"w=3")
 axs[0, 0].set_title(f"Welch w=3")
@@ -276,17 +312,17 @@ axs[0, 1].plot(x, data[f"Welch w=5"], label=f"w=5")
 axs[0, 1].set_title(f"Welch w=5")
 axs[0, 1].legend()
 
-axs[1, 0].plot(x, data[f"Welch w=7"], label=f"w=7")
-axs[1, 0].set_title(f"Welch w=7")
+axs[1, 0].plot(x, data[f"Welch w=10"], label=f"w=7")
+axs[1, 0].set_title(f"Welch w=10")
 axs[1, 0].legend()
 
-axs[1, 1].plot(x, data[f"Welch w=9"], label=f"w=9")
-axs[1, 1].set_title(f"Welch w=9")
+axs[1, 1].plot(x, data[f"Welch w=19"], label=f"w=9")
+axs[1, 1].set_title(f"Welch w=19")
 axs[1, 1].legend()
 
 plt.tight_layout()
 plt.show()
 
 dataframe = pd.DataFrame(data)
-dataframe.to_csv("output.csv", index=False)
-# dataframe.to_excel("output.xlsx", index=False)
+# dataframe.to_csv("output.csv", index=False)
+dataframe.to_excel("output.xlsx", index=False)
