@@ -2,63 +2,7 @@ from NAGenerator import NAGenerator, SEED, MULTIPLIER, MODULUS
 from Generators import *
 import pandas as pd
 import matplotlib.pyplot as plt
-
-
-# Clase que representa un servidor
-class Server:
-    def __init__(self, gen: Generator) -> None:
-        self.gen = gen
-        self.end = 0
-
-    def reset(self):
-        self.end = 0
-
-
-# Clase que representa un arreglo de servidores
-class ServiceArray:
-    def __init__(self, servers: list[Server] = None) -> None:
-        self.servers = servers
-        self.end = 0
-
-    def min_server(self):
-        min = 100000000
-        imin = 0
-        for i, serv in enumerate(self.servers):
-            if min > serv.end:
-                min = serv.end
-                imin = i
-        return imin, min
-
-    def reset(self):
-        for serv in self.servers:
-            serv.reset()
-
-
-class Doc:
-    def __init__(self):
-        self.end = 0
-
-
-class DocsArray:
-    def __init__(self):
-        self.count = 0
-        self.docs = []
-
-    def update(self, time):
-        for doc in self.docs:
-            if doc.end <= time:
-                self.docs.remove(doc)
-                self.count -= 1
-
-    def add(self, end):
-        self.docs.append(Doc())
-        self.docs[-1].end = end
-        self.count += 1
-
-    def reset(self):
-        self.count = 0
-        self.docs = []
-
+from Objects import *
 
 # Variable que representa los servidores de procesamiento de documentos
 servers = ServiceArray(
@@ -82,7 +26,7 @@ derivation = Server(ExponentialGen(0.173))
 docs = DocsArray()
 
 # Número de ejecuciones
-runs = 81815
+runs = 112001
 # Réplicas
 rep = 15
 # Tiempo de simulación
@@ -112,17 +56,12 @@ data = {
     "NA's Servidor 5": [],
     "Inicio Servidor 5": [],
     "Fin Servidor 5": [],
-    # "NA's Derivación": [],
-    # "T. de Derivación": [],
-    # "Inicio Derivación": [],
-    # "Fin Derivación": [],
     "Cola Distribución": [],
     "Cola Servidor": [],
-    # "Cola Derivación": [],
     "Cola Total": [],
     "Documentos en Cola": [],
-    "Promedio Móvil": [],
-    "Promedio Docs en Cola": []
+    "Promedio Movil de Tiempo en Cola": [],
+    "Promedio Movil de Documentos en Cola": []
 }
 # Suma
 suma = 0
@@ -159,17 +98,22 @@ def update_serv_arr(index, init, end, nas):
 
 
 for i in range(rep):
-    data[f"Replica {i + 1}"] = []
-
-data["Valores medios de replicas"] = []
+    data[f"Replica {i + 1} TCola"] = []
+for i in range(rep):
+    data[f"Replica {i + 1} DCola"] = []
+if rep > 0:
+    data["Medias por Corrida en TCola"] = []
+    data["Medias por Corrida en DCola"] = []
 
 # Réplicas
-for i in range(rep - 1):
+for i in range(rep):
     suma = 0
     time = 0
+    suma2 = 0
     servers.reset()
     distribution.reset()
     derivation.reset()
+    docs.reset()
     for run in range(runs):
         # Arribo
         inter_arr_t, arr_nas = arrival.get_rand(rand)  # T. de inter Arribo y NA's
@@ -179,105 +123,65 @@ for i in range(rep - 1):
         arr_t = time
         # Distribución
         dis_t, dis_nas = distribution.gen.get_rand(rand)  # T. Distribución y NA's
-        dist_t = -0.001 + 0.261 * dis_t
+        dis_t = -0.001 + 0.261 * dis_t
         i_dis_t = max(arr_t, distribution.end)  # T. de inicio de distribución
-        e_dist_t = i_dis_t + dis_t  # T. de fin de distribución
-        distribution.end = e_dist_t  # Actualizar el fin del servidor de distribución
+        e_dis_t = i_dis_t + dis_t  # T. de fin de distribución
+        distribution.end = e_dis_t  # Actualizar el fin del servidor de distribución
         q_dis = i_dis_t - arr_t  # T. de cola de Distribución
         # Servidor
         in_serv, e_min = servers.min_server()  # Indice de servidor y fin mínimo
-        i_serv_t = max(e_min, e_dist_t)  # Inicio de servicio
-        # i_serv_t = max(e_min, arr_t)
+        i_serv_t = max(e_min, e_dis_t)  # Inicio de servicio
         e_serv_t, ser_nas = get_time_serv(i_serv_t, in_serv)  # Fin del servidor y NA's
-        q_serv = i_serv_t - e_dist_t  # Cola del servidor
-        # q_serv = i_serv_t - arr_t
-        # Derivación
-        # der_t, der_nas = derivation.gen.get_rand(rand)  # T. de derivación y NA's
-        # der_t = -0.001 + der_t
-        # i_der_t = max(e_serv_t, derivation.end)  # T. de inicio de derivación
-        # e_der_t = i_der_t + der_t  # T. de fin de distribución
-        # derivation.end = e_der_t  # Actualiza el fin del servidor de derivación
-        # q_der = i_der_t - e_serv_t  # Cola de derivación
+        q_serv = i_serv_t - e_dis_t  # Cola del servidor
         q_der = 0
         suma += q_der + q_dis + q_serv
-        data[f"Replica {i + 1}"].append(suma / (run + 1))
+        docs.add(i_dis_t)
+        docs.update(time)
+        suma2 += docs.count
+        data[f"Replica {i + 1} TCola"].append(suma / (run + 1))
+        data[f"Replica {i + 1} DCola"].append(suma2 / (run + 1))
+        if i == rep - 1:
+            data["Iteración"].append(run + 1)
+            data["NA's Arribo"].append(str(arr_nas))
+            data["Arribo"].append(inter_arr_t)
+            data["T. de Llegada"].append(arr_t)
+            data["NA's Distribución"].append(str(dis_nas))
+            data["T. Distribución"].append(dis_t)
+            data["Inicio Distribución"].append(i_dis_t)
+            data["Fin Distribución"].append(e_dis_t)
+            data["Cola Distribución"].append(q_dis)
+            data["Cola Servidor"].append(q_serv)
+            data["Cola Total"].append(q_der + q_dis + q_serv)
+            data["Documentos en Cola"].append(docs.count)
+            data["Promedio Movil de Tiempo en Cola"].append(suma / (run + 1))
+            data["Promedio Movil de Documentos en Cola"].append(suma2 / (run + 1))
+            update_serv_arr(in_serv, i_serv_t, e_serv_t, ser_nas)
 
-suma = 0
-suma2 = 0
-time = 0
-servers.reset()
-distribution.reset()
-derivation.reset()
+if rep > 0:
+    data["Replica 15 TCola"] = data["Promedio Movil de Tiempo en Cola"]
+    data["Replica 15 DCola"] = data["Promedio Movil de Documentos en Cola"]
 
-# Simulación
-for run in range(runs):
-    # Arribo
-    inter_arr_t, arr_nas = arrival.get_rand(rand)  # T. de inter Arribo y NA's
-    inter_arr_t = -0.001 + 1.961 * inter_arr_t
-    time += inter_arr_t
-    # Tiempo de llegada
-    arr_t = time
-    # Distribución
-    dis_t, dis_nas = distribution.gen.get_rand(rand)  # T. Distribución y NA's
-    dist_t = -0.001 + 0.261 * dis_t
-    i_dis_t = max(arr_t, distribution.end)  # T. de inicio de distribución
-    e_dist_t = i_dis_t + dis_t  # T. de fin de distribución
-    distribution.end = e_dist_t  # Actualizar el fin del servidor de distribución
-    q_dis = i_dis_t - arr_t  # T. de cola de Distribución
-    # Servidor
-    in_serv, e_min = servers.min_server()  # Indice de servidor y fin mínimo
-    i_serv_t = max(e_min, e_dist_t)  # Inicio de servicio
-    # i_serv_t = max(e_min, arr_t)
-    e_serv_t, ser_nas = get_time_serv(i_serv_t, in_serv)  # Fin del servidor y NA's
-    q_serv = i_serv_t - e_dist_t  # Cola del servidor
-    # q_serv = i_serv_t - arr_t
-    # Derivación
-    # der_t, der_nas = derivation.gen.get_rand(rand)  # T. de derivación y NA's
-    # der_t = -0.001 + der_t
-    # i_der_t = max(e_serv_t, derivation.end)  # T. de inicio de derivación
-    # e_der_t = i_der_t + der_t  # T. de fin de distribución
-    # derivation.end = e_der_t  # Actualiza el fin del servidor de derivación
-    # q_der = i_der_t - e_serv_t  # Cola de derivación
-    q_der = 0
-    suma += q_der + q_dis + q_serv
-    docs.add(i_dis_t)
-    docs.update(time)
-    suma2 += docs.count
-    # suma += q_serv
-    # Guardado de datos
-    data["Iteración"].append(run + 1)
-    data["NA's Arribo"].append(str(arr_nas))
-    data["Arribo"].append(inter_arr_t)
-    data["T. de Llegada"].append(arr_t)
-    data["NA's Distribución"].append(str(dis_nas))
-    data["T. Distribución"].append(dis_t)
-    data["Inicio Distribución"].append(i_dis_t)
-    data["Fin Distribución"].append(e_dist_t)
-    # data["NA's Derivación"].append(str(der_nas))
-    # data["T. de Derivación"].append(der_t)
-    # data["Inicio Derivación"].append(i_der_t)
-    # data["Fin Derivación"].append(e_der_t)
-    data["Cola Distribución"].append(q_dis)
-    data["Cola Servidor"].append(q_serv)
-    # data["Cola Derivación"].append(q_der)
-    data["Cola Total"].append(q_der + q_dis + q_serv)
-    data["Documentos en Cola"].append(docs.count)
-    data["Promedio Móvil"].append(suma / (run + 1))
-    data["Promedio Docs en Cola"].append(suma2 / (run + 1))
-    update_serv_arr(in_serv, i_serv_t, e_serv_t, ser_nas)
+    x = [i + 1 for i in range(runs)]
+    for key, value in data.items():
+        if key.startswith("Replica") and key.endswith("TCola"):
+            plt.plot(x, value, label=f"{key}")
 
-data["Replica 15"] = data["Promedio Móvil"]
+    plt.title("Estabilización de las repeticiones")
+    plt.xlabel = "Nro Corridas"
+    plt.ylabel = "Promedio móvil de la cola"
+    plt.legend()
+    plt.show()
 
-x = [i + 1 for i in range(runs)]
-for key, value in data.items():
-    if key.startswith("Replica"):
-        plt.plot(x, value, label=f"{key}")
+    plt.clf()
+    for key, value in data.items():
+        if key.startswith("Replica") and key.endswith("DCola"):
+            plt.plot(x, value, label=f"{key}")
 
-plt.title("Estabilización de las repeticiones")
-plt.xlabel = "Nro Corridas"
-plt.ylabel = "Promedio móvil de la cola"
-plt.legend()
-plt.show()
+    plt.title("Estabilización de las repeticiones")
+    plt.xlabel = "Nro Corridas"
+    plt.ylabel = "Promedio móvil de documentos en cola"
+    plt.legend()
+    plt.show()
 
 
 def welch_method(data, window_size):
@@ -293,35 +197,66 @@ def welch_method(data, window_size):
     return np.array(moving_avg)
 
 
-for i in range(runs):
-    sum_ins = 0
-    for j in range(rep):
-        sum_ins += data[f"Replica {j + 1}"][i]
-    data["Valores medios de replicas"].append(sum_ins / rep)
+if rep > 0:
+    for i in range(runs):
+        sum_ins = 0
+        for j in range(rep):
+            sum_ins += data[f"Replica {j + 1} TCola"][i]
+        data["Medias por Corrida en TCola"].append(sum_ins / rep)
 
-fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
 
-for i in [3, 5, 10, 19]:
-    data[f"Welch w={i}"] = welch_method(data["Valores medios de replicas"], i)
+    for i in [3, 5, 10, 19]:
+        data[f"Welch w={i} TCola"] = welch_method(data["Medias por Corrida en TCola"], i)
 
-axs[0, 0].plot(x, data[f"Welch w=3"], label=f"w=3")
-axs[0, 0].set_title(f"Welch w=3")
-axs[0, 0].legend()
+    axs[0, 0].plot(x, data[f"Welch w=3 TCola"], label=f"w=3")
+    axs[0, 0].set_title(f"Welch w=3")
+    axs[0, 0].legend()
 
-axs[0, 1].plot(x, data[f"Welch w=5"], label=f"w=5")
-axs[0, 1].set_title(f"Welch w=5")
-axs[0, 1].legend()
+    axs[0, 1].plot(x, data[f"Welch w=5 TCola"], label=f"w=5")
+    axs[0, 1].set_title(f"Welch w=5")
+    axs[0, 1].legend()
 
-axs[1, 0].plot(x, data[f"Welch w=10"], label=f"w=7")
-axs[1, 0].set_title(f"Welch w=10")
-axs[1, 0].legend()
+    axs[1, 0].plot(x, data[f"Welch w=10 TCola"], label=f"w=7")
+    axs[1, 0].set_title(f"Welch w=10")
+    axs[1, 0].legend()
 
-axs[1, 1].plot(x, data[f"Welch w=19"], label=f"w=9")
-axs[1, 1].set_title(f"Welch w=19")
-axs[1, 1].legend()
+    axs[1, 1].plot(x, data[f"Welch w=19 TCola"], label=f"w=9")
+    axs[1, 1].set_title(f"Welch w=19")
+    axs[1, 1].legend()
 
-plt.tight_layout()
-plt.show()
+    plt.tight_layout()
+    plt.show()
+
+    for i in range(runs):
+        sum_ins = 0
+        for j in range(rep):
+            sum_ins += data[f"Replica {j + 1} DCola"][i]
+        data["Medias por Corrida en DCola"].append(sum_ins / rep)
+
+    fig, axs = plt.subplots(2, 2, figsize=(12, 10))
+
+    for i in [3, 5, 10, 19]:
+        data[f"Welch w={i} DCola"] = welch_method(data["Medias por Corrida en DCola"], i)
+
+    axs[0, 0].plot(x, data[f"Welch w=3 DCola"], label=f"w=3")
+    axs[0, 0].set_title(f"Welch w=3")
+    axs[0, 0].legend()
+
+    axs[0, 1].plot(x, data[f"Welch w=5 DCola"], label=f"w=5")
+    axs[0, 1].set_title(f"Welch w=5")
+    axs[0, 1].legend()
+
+    axs[1, 0].plot(x, data[f"Welch w=10 DCola"], label=f"w=7")
+    axs[1, 0].set_title(f"Welch w=10")
+    axs[1, 0].legend()
+
+    axs[1, 1].plot(x, data[f"Welch w=19 DCola"], label=f"w=9")
+    axs[1, 1].set_title(f"Welch w=19")
+    axs[1, 1].legend()
+
+    plt.tight_layout()
+    plt.show()
 
 dataframe = pd.DataFrame(data)
 # dataframe.to_csv("output.csv", index=False)
