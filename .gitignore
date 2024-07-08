@@ -2,6 +2,5 @@
 /Code/*.xlsx
 /Code/__pycache__/
 Code/.idea/
-Code
 /Code/*.csv
 /Code/*.mpx
