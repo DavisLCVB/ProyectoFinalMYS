@@ -27,7 +27,7 @@ derivation = Server(ExponentialGen(0.173))
 
 docs = DocsArray()
 # Número de ejecuciones
-runs = 70000
+runs = 127513
 # Réplicas
 rep = 15
 # Tiempo de simulación
