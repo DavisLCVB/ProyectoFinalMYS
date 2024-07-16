@@ -1,7 +1,8 @@
 /.obsidian
-/Code/*.xlsx
-/Code/__pycache__/
-Code/.idea/
-/Code/*.csv
-/Code/*.mpx
-/Code/*.mpx.bak
+/src/*.xlsx
+/src/__pycache__/
+/src/.idea/
+/src/*.csv
+/src/*.mpx
+/src/*.mpx.bak
+/docs
